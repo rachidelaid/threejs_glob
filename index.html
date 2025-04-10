@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Glob Threejs</title>
+    <style>
+      body {
+        margin: 0;
+        background-color: #000;
+        overflow: hidden;
+      }
+
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+
+  <body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/101/three.min.js"></script>
+
+    <script>
+      const scene = new THREE.Scene();
+
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+
+      const renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      document.body.appendChild(renderer.domElement);
+
+      const ambientLight = new THREE.AmbientLight(0x404040);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(5, 3, 5);
+      scene.add(directionalLight);
+
+      const earthGroup = new THREE.Group();
+      scene.add(earthGroup);
+
+      const earthRadius = 5;
+      const earthGeometry = new THREE.SphereGeometry(earthRadius, 64, 64);
+      const earthMaterial = new THREE.MeshPhongMaterial({
+        map: new THREE.TextureLoader().load(
+          "https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg"
+        ),
+        bumpMap: new THREE.TextureLoader().load(
+          "https://threejs.org/examples/textures/planets/earth_normal_2048.jpg"
+        ),
+        bumpScale: 0.05,
+        specularMap: new THREE.TextureLoader().load(
+          "https://threejs.org/examples/textures/planets/earth_specular_2048.jpg"
+        ),
+        specular: new THREE.Color(0x333333),
+        shininess: 15,
+      });
+      const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+      earthGroup.add(earth);
+
+      camera.position.z = 15;
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      function animate() {
+        requestAnimationFrame(animate);
+        earthGroup.rotation.y += 0.002;
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      const cloudGeometry = new THREE.SphereGeometry(earthRadius + 0.1, 64, 64);
+      const cloudMaterial = new THREE.MeshPhongMaterial({
+        map: new THREE.TextureLoader().load(
+          "https://threejs.org/examples/textures/planets/earth_clouds_1024.png"
+        ),
+        transparent: true,
+        opacity: 0.4,
+      });
+
+      const clouds = new THREE.Mesh(cloudGeometry, cloudMaterial);
+      earthGroup.add(clouds);
+
+      clouds.rotation.y += 0.0005;
+
+      const locations = [
+        {
+          lat: 40.7128,
+          lng: -74.006,
+          name: "New York",
+        },
+        {
+          lat: 37.7749,
+          lng: -122.4194,
+          name: "San Francisco",
+        },
+        {
+          lat: 48.8566,
+          lng: 2.3522,
+          name: "Paris",
+        },
+        {
+          lat: 51.5074,
+          lng: -0.1277,
+          name: "London",
+        },
+        {
+          lat: 46.76333,
+          lng: 4.83547,
+          name: "Lyon",
+        },
+        {
+          lat: -15.797832351545933,
+          lng: -47.89210026923629,
+          name: "Brasília",
+        },
+        {
+          lat: -33.867451030674886,
+          lng: 151.2086080307785,
+          name: "Sydney",
+        },
+        {
+          lat: 35.681236,
+          lng: 139.767125,
+          name: "Tokyo",
+        },
+      ];
+
+      const cityMarkers = [];
+
+      function addLocationDot(location, size = 0.1, color = 0x00ff00) {
+        const { lat, lng, name } = location;
+
+        const phi = (90 - lat) * (Math.PI / 180);
+        const theta = (lng + 180) * (Math.PI / 180);
+
+        const x = -(earthRadius + 0.2) * Math.sin(phi) * Math.cos(theta);
+        const y = (earthRadius + 0.2) * Math.cos(phi);
+        const z = (earthRadius + 0.2) * Math.sin(phi) * Math.sin(theta);
+
+        const locationGroup = new THREE.Group();
+        locationGroup.name = name;
+        locationGroup.userData = location;
+
+        const dotGeometry = new THREE.SphereGeometry(size, 16, 16);
+        const dotMaterial = new THREE.MeshBasicMaterial({ color });
+        const dot = new THREE.Mesh(dotGeometry, dotMaterial);
+        dot.position.set(x, y, z);
+        locationGroup.add(dot);
+
+        const glowGeometry = new THREE.SphereGeometry(size * 1.5, 16, 16);
+        const glowMaterial = new THREE.MeshBasicMaterial({
+          color,
+          opacity: 0.3,
+          transparent: true,
+        });
+
+        const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+        glow.position.set(x, y, z);
+        locationGroup.add(glow);
+
+        earthGroup.add(locationGroup);
+
+        cityMarkers.push({
+          group: locationGroup,
+          dot: dot,
+          glow: glow,
+          position: new THREE.Vector3(x, y, z),
+          info: location,
+        });
+
+        return {
+          dot,
+          glow,
+          locationGroup,
+        };
+      }
+
+      const dots = [];
+
+      locations.forEach((loc) => {
+        dots.push(addLocationDot(loc));
+      });
+
+      const time = Date.now() * 0.001;
+      cityMarkers.forEach((marker, index) => {
+        if (!marker.isSelected) {
+          const scale = 1 + 0.1 * Math.sin(time + index);
+          marker.glow.scale.set(scale, scale, scale);
+        }
+      });
+
+      let autoRotate = false;
+      let isDragging = false;
+      let prevMousePosition = {
+        x: 0,
+        y: 0,
+      };
+
+      document.addEventListener("mousedown", (event) => {
+        isDragging = true;
+      });
+
+      document.addEventListener("mouseup", () => {
+        isDragging = false;
+      });
+
+      document.addEventListener("mousemove", (event) => {
+        if (isDragging) {
+          const deltaMove = {
+            x: event.clientX - prevMousePosition.x,
+            y: event.clientY - prevMousePosition.y,
+          };
+
+          if (deltaMove.x !== 0 || deltaMove.y !== 0) {
+            autoRotate = false;
+
+            const rotationSpeed = 0.002;
+            const rotationX = deltaMove.y * rotationSpeed;
+            const rotationY = deltaMove.x * rotationSpeed;
+
+            earthGroup.rotation.x += rotationX;
+            earthGroup.rotation.y += rotationY;
+          }
+        }
+
+        prevMousePosition = {
+          x: event.clientX,
+          y: event.clientY,
+        };
+      });
+    </script>
+  </body>
+</html>
