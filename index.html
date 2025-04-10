@@ -224,7 +224,7 @@
         isDragging = false;
       });
 
-      const handleMouseMove = (event) => {
+      document.addEventListener("mousemove", (event) => {
         if (isDragging) {
           const deltaMove = {
             x: event.clientX - prevMousePosition.x,
@@ -247,10 +247,31 @@
           x: event.clientX,
           y: event.clientY,
         };
-      };
+      });
+      document.addEventListener("touchmove", (event) => {
+        if (isDragging) {
+          const deltaMove = {
+            x: event.touches[0].clientX - prevMousePosition.x,
+            y: event.touches[0].clientY - prevMousePosition.y,
+          };
 
-      document.addEventListener("mousemove", handleMouseMove);
-      document.addEventListener("touchmove", handleMouseMove);
+          if (deltaMove.x !== 0 || deltaMove.y !== 0) {
+            autoRotate = false;
+
+            const rotationSpeed = 0.002;
+            const rotationX = deltaMove.y * rotationSpeed;
+            const rotationY = deltaMove.x * rotationSpeed;
+
+            earthGroup.rotation.x += rotationX;
+            earthGroup.rotation.y += rotationY;
+          }
+        }
+
+        prevMousePosition = {
+          x: event.touches[0].clientX,
+          y: event.touches[0].clientY,
+        };
+      });
     </script>
   </body>
 </html>
