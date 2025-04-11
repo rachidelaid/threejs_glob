@@ -5,6 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Glob Threejs</title>
     <style>
+      #info {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 400px;
+        display: none;
+        background-color: rgba(255, 255, 255, 0.5);
+        backdrop-filter: blur(10px);
+        z-index: 1000;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.5);
+        transform: translateX(-50%);
+        text-align: center;
+      }
+      #info-title {
+        font-size: 24px;
+        font-weight: bold;
+        color: #000;
+      }
+      #info-content {
+        font-size: 16px;
+        color: #000;
+      }
+
       body {
         margin: 0;
         background-color: #000;
@@ -18,9 +46,25 @@
   </head>
 
   <body>
+    <div id="info">
+      <div id="info-title"></div>
+      <div id="info-content">
+        Lorem ipsum dolor sit amet consectetur adipisicing elit. Debitis cumque
+        laudantium fugit voluptatum autem sed labore cum laboriosam quasi, error
+        ducimus magnam ipsa temporibus tenetur id eveniet accusantium quae
+        pariatur?
+      </div>
+      <b id="info-close">click anywhere to close</b>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/101/three.min.js"></script>
 
     <script>
+      let ROTATION_SPEED = 0.002;
+
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+
       const scene = new THREE.Scene();
 
       const camera = new THREE.PerspectiveCamera(
@@ -29,6 +73,94 @@
         0.1,
         1000
       );
+
+      const showInfo = (location, originalMousePosition) => {
+        console.log(originalMousePosition);
+        ROTATION_SPEED = 0;
+        document.getElementById("info-title").textContent = location.name;
+        // document.getElementById("info-content").textContent =
+        //   location.description;
+
+        document.getElementById(
+          "info"
+        ).style.left = `${originalMousePosition.x}px`;
+
+        document.getElementById("info").style.top = `calc(${
+          originalMousePosition.y
+        }px - ${document.getElementById("info").offsetHeight}px + 20px)`;
+
+        document.getElementById("info").style.display = "flex";
+      };
+
+      const hideInfo = () => {
+        ROTATION_SPEED = 0.002;
+        document.getElementById("info").style.display = "none";
+      };
+
+      document.addEventListener("click", (event) => {
+        event.preventDefault();
+
+        const originalMousePosition = {
+          x: event.clientX,
+          y: event.clientY,
+        };
+
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+
+        const intersects = raycaster.intersectObjects(
+          earthGroup.children,
+          true
+        );
+
+        let clickedCity;
+
+        if (intersects.length > 0) {
+          for (const cityMarker of cityMarkers) {
+            const dotId = cityMarker.dot.id;
+            const glowId = cityMarker.glow.id;
+
+            for (const intersect of intersects) {
+              if (
+                intersect.object.id === dotId ||
+                intersect.object.id === glowId
+              ) {
+                clickedCity = cityMarker.info;
+                break;
+              }
+            }
+
+            if (clickedCity) break;
+          }
+        }
+
+        if (clickedCity) {
+          showInfo(clickedCity, originalMousePosition);
+          cityMarkers.forEach((marker) => {
+            if (marker.info !== clickedCity) {
+              marker.glow.scale.set(1, 1, 1);
+              marker.glow.material.color.set(0x00ff00);
+              marker.dot.material.color.set(0x00ff00);
+              marker.isSelected = false;
+            } else {
+              marker.glow.scale.set(2, 2, 2);
+              marker.glow.material.color.set(0xfff000);
+              marker.dot.material.color.set(0xfff000);
+              marker.isSelected = true;
+            }
+          });
+        } else {
+          hideInfo();
+          cityMarkers.forEach((marker) => {
+            marker.glow.scale.set(1, 1, 1);
+            marker.glow.material.color.set(0x00ff00);
+            marker.dot.material.color.set(0x00ff00);
+            marker.isSelected = false;
+          });
+        }
+      });
 
       const renderer = new THREE.WebGLRenderer();
       renderer.setSize(window.innerWidth, window.innerHeight);
@@ -75,7 +207,7 @@
 
       function animate() {
         requestAnimationFrame(animate);
-        earthGroup.rotation.y += 0.002;
+        earthGroup.rotation.y += ROTATION_SPEED;
         renderer.render(scene, camera);
       }
       animate();
@@ -154,7 +286,10 @@
         locationGroup.userData = location;
 
         const dotGeometry = new THREE.SphereGeometry(size, 16, 16);
-        const dotMaterial = new THREE.MeshBasicMaterial({ color });
+        const dotMaterial = new THREE.MeshBasicMaterial({
+          color,
+          // depthTest: false,
+        });
         const dot = new THREE.Mesh(dotGeometry, dotMaterial);
         dot.position.set(x, y, z);
         locationGroup.add(dot);
@@ -164,6 +299,7 @@
           color,
           opacity: 0.3,
           transparent: true,
+          // depthTest: false,
         });
 
         const glow = new THREE.Mesh(glowGeometry, glowMaterial);
@@ -248,6 +384,7 @@
           y: event.clientY,
         };
       });
+
       document.addEventListener("touchmove", (event) => {
         if (isDragging) {
           const deltaMove = {
